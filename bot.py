@@ -6,6 +6,8 @@ from aiogram.filters import Command
 from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
 
+from keep_alive import keep_alive  # импорт keep_alive
+
 load_dotenv()  # Поддержка локального запуска с .env
 
 TELEGRAM_API_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
@@ -15,6 +17,9 @@ if not TELEGRAM_API_TOKEN or not HF_TOKEN:
 
 bot = Bot(token=TELEGRAM_API_TOKEN)
 dp = Dispatcher()
+
+keep_alive()  # запуск веб-сервера для keep-alive
+
 client = InferenceClient(token=HF_TOKEN)
 user_memory = defaultdict(list)
 
@@ -36,7 +41,7 @@ async def generate_levi_reply(user_id: int, user_text: str) -> str:
             top_p=0.95,
             do_sample=True,
         )
-        reply = resp.strip().split("Пользователь:")[0].strip()
+        reply = resp.get("generated_text", "").strip().split("Пользователь:")[0].strip()
         user_memory[user_id].append({"user": user_text, "levi": reply})
         return reply
     except Exception as e:
