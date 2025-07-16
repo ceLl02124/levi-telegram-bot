@@ -6,19 +6,20 @@ from aiogram.filters import Command
 from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
 
-from keep_alive import keep_alive  # импорт keep_alive
+from keep_alive import keep_alive
 
-load_dotenv()  # Поддержка локального запуска с .env
+load_dotenv()
 
 TELEGRAM_API_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
 HF_TOKEN = os.getenv("HF_TOKEN")
+
 if not TELEGRAM_API_TOKEN or not HF_TOKEN:
     raise RuntimeError("Не заданы TELEGRAM_API_TOKEN или HF_TOKEN")
 
 bot = Bot(token=TELEGRAM_API_TOKEN)
 dp = Dispatcher()
 
-keep_alive()  # запуск веб-сервера для keep-alive
+keep_alive()
 
 client = InferenceClient(token=HF_TOKEN)
 user_memory = defaultdict(list)
@@ -64,4 +65,6 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
+
 
