@@ -1,3 +1,6 @@
 aiogram
 huggingface_hub
 python-dotenv
+flask
+aiohttp
+aiohttp
