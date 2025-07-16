@@ -6,33 +6,25 @@ from aiogram.filters import Command
 from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
 
-# Загрузка переменных окружения
 load_dotenv()
 
-# Получение токенов из .env или окружения
 TELEGRAM_API_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
 HF_TOKEN = os.getenv("HF_TOKEN")
 
-# Проверка наличия токенов
 if not TELEGRAM_API_TOKEN or not HF_TOKEN:
     raise RuntimeError("Не заданы TELEGRAM_API_TOKEN или HF_TOKEN")
 
-# Инициализация бота и клиента HuggingFace
 bot = Bot(token=TELEGRAM_API_TOKEN)
 dp = Dispatcher()
 client = InferenceClient(token=HF_TOKEN)
-
-# Хранилище истории переписки
 user_memory = defaultdict(list)
 
-# Системный промпт для Леви
 SYSTEM_PROMPT = (
     "Ты — Леви Аккерман из 'Атаки Титанов'. Говоришь грубо, хладнокровно, логично. "
     "Пишешь как в ролевой игре с описанием действий, мыслей и эмоций.\n\n"
 )
 
 async def generate_levi_reply(user_id: int, user_text: str) -> str:
-    """Генерация ответа от Леви с использованием Hugging Face"""
     history = user_memory[user_id][-10:]
     conv = "\n".join([f"Пользователь: {h['user']}\nЛеви: {h['levi']}" for h in history])
     prompt = f"{SYSTEM_PROMPT}{conv}\nПользователь: {user_text}\nЛеви:"
