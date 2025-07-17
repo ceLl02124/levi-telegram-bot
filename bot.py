@@ -1,7 +1,5 @@
 import os
 import asyncio
-import random
-import logging
 from collections import defaultdict
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
@@ -80,7 +78,8 @@ async def main():
     print("Бот Леви запущен.")
     await dp.start_polling(bot)
 
-if __name__ == "__main__":
+if name == "main":
     asyncio.run(main())
+
 
 
