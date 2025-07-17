@@ -1,88 +1,88 @@
 import os
 import asyncio
-import random
-import logging
 from collections import defaultdict
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from huggingface_hub import InferenceClient
-import psycopg2
 from dotenv import load_dotenv
 
-# Загрузка переменных из .env
+# Загружаем переменные окружения из файла .env
 load_dotenv()
 
 TELEGRAM_API_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
 HF_TOKEN = os.getenv("HF_TOKEN")
-DATABASE_URL = os.getenv("DATABASE_URL")
 
-if not TELEGRAM_API_TOKEN or not HF_TOKEN or not DATABASE_URL:
-    raise RuntimeError("Не заданы TELEGRAM_API_TOKEN, HF_TOKEN или DATABASE_URL")
+if not TELEGRAM_API_TOKEN or not HF_TOKEN:
+    raise RuntimeError("Не заданы TELEGRAM_API_TOKEN или HF_TOKEN")
 
+# Инициализация бота и диспетчера
 bot = Bot(token=TELEGRAM_API_TOKEN)
 dp = Dispatcher()
-client = InferenceClient(token=HF_TOKEN)
+
+# Инициализация клиента Hugging Face
+client = InferenceClient(
+    provider="huggingface",  # Используем Hugging Face как провайдера
+    api_key=HF_TOKEN
+)
+
+# Словарь для хранения истории сообщений пользователей
 user_memory = defaultdict(list)
 
-def get_db_connection():
-    return psycopg2.connect(DATABASE_URL)
-
-def save_user_message(user_id, message):
-    try:
-        conn = get_db_connection()
-        cur = conn.cursor()
-        cur.execute("INSERT INTO user_messages (user_id, message) VALUES (%s, %s)", (user_id, message))
-        conn.commit()
-        cur.close()
-        conn.close()
-    except Exception as e:
-        logging.error(f"Ошибка при сохранении сообщения в БД: {e}")
-
+# Системный запрос (инструкция для Леви)
 SYSTEM_PROMPT = (
     "Ты — Леви Аккерман из 'Атаки Титанов'. Говоришь грубо, хладнокровно, логично. "
     "Пишешь как в ролевой игре с описанием действий, мыслей и эмоций.\n\n"
 )
 
+# Функция для генерации ответа Леви
 async def generate_levi_reply(user_id: int, user_text: str) -> str:
     history = user_memory[user_id][-10:]
     conv = "\n".join([f"Пользователь: {h['user']}\nЛеви: {h['levi']}" for h in history])
     prompt = f"{SYSTEM_PROMPT}{conv}\nПользователь: {user_text}\nЛеви:"
 
     try:
-        # Используем асинхронный вызов, если поддерживается
-        resp = await asyncio.to_thread(
-            client.text_generation,
-            prompt,
-            model="tiiuae/falcon-7b-instruct",
-            max_new_tokens=500,
-            temperature=0.8,
-            top_p=0.95,
-            do_sample=True,
+        # Запрос к Hugging Face для получения ответа
+        response = client.chat.completions.create(
+            model="moonshotai/Kimi-K2-Instruct",  # Указание модели
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=500,  # Максимальное количество токенов для ответа
+            temperature=0.8,  # Уровень случайности
+            top_p=0.95,  # Стратегия генерации
+            do_sample=True,  # Включение выборки
         )
-        reply = resp.strip().split("Пользователь:")[0].strip()
+        reply = response.choices[0].message['content'].strip()
+        # Сохраняем ответ в историю
         user_memory[user_id].append({"user": user_text, "levi": reply})
-        save_user_message(user_id, user_text)
-        return reply if reply else "Леви: (ответ пустой)"
+        return reply
     except Exception as e:
-        logging.error(f"Ошибка генерации ответа: {e}")
-        return f"Леви: (ошибка генерации — {e})"
+        print("Ошибка:", e)
+        return "Леви: ..."
 
+# Обработчик команды /start
 @dp.message(Command("start"))
 async def cmd_start(msg: types.Message):
     await msg.answer("Леви: Я здесь. Говори.")
 
+# Обработчик текстовых сообщений
 @dp.message()
 async def handler(msg: types.Message):
-    txt = msg.text or ""
-    reply = await generate_levi_reply(msg.from_user.id, txt)
+    user_id = msg.from_user.id
+    user_text = msg.text or ""
+    
+    # Получаем ответ от Леви
+    reply = await generate_levi_reply(user_id, user_text)
+    
+    # Отправляем ответ пользователю
     await msg.reply(reply)
 
+# Главная функция для запуска бота
 async def main():
-    logging.basicConfig(level=logging.INFO)
     print("Бот Леви запущен.")
     await dp.start_polling(bot)
 
+# Запуск бота
 if __name__ == "__main__":
     asyncio.run(main())
+
 
 
