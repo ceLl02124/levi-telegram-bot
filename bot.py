@@ -4,13 +4,13 @@ from collections import defaultdict
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from huggingface_hub import InferenceClient
-import psycopg2
+import asyncpg
 from dotenv import load_dotenv
+import logging
 
 # Загрузка переменных из .env
 load_dotenv()
 
-# Получение токенов и URL базы данных
 TELEGRAM_API_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
 HF_TOKEN = os.getenv("HF_TOKEN")
 DATABASE_URL = os.getenv("DATABASE_URL")
@@ -23,33 +23,30 @@ dp = Dispatcher()
 client = InferenceClient(token=HF_TOKEN)
 user_memory = defaultdict(list)
 
-# Подключение к базе данных PostgreSQL
-def get_db_connection():
-    conn = psycopg2.connect(DATABASE_URL)
-    return conn
-
-# Пример простого запроса для получения/сохранения контекста пользователя в базе данных
-def save_user_message(user_id, message):
-    conn = get_db_connection()
-    cur = conn.cursor()
-    cur.execute("INSERT INTO user_messages (user_id, message) VALUES (%s, %s)", (user_id, message))
-    conn.commit()
-    cur.close()
-    conn.close()
+logging.basicConfig(level=logging.INFO)
 
 SYSTEM_PROMPT = (
     "Ты — Леви Аккерман из 'Атаки Титанов'. Говоришь грубо, хладнокровно, логично. "
     "Пишешь как в ролевой игре с описанием действий, мыслей и эмоций.\n\n"
 )
 
-async def generate_levi_reply(user_id: int, user_text: str) -> str:
+# Асинхронное подключение к PostgreSQL
+async def get_db_pool():
+    return await asyncpg.create_pool(DATABASE_URL)
+
+# Пример асинхронного запроса для сохранения сообщений пользователя в базе данных
+async def save_user_message(pool, user_id, message):
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO user_messages (user_id, message) VALUES ($1, $2)", user_id, message
+        )
+
+async def generate_levi_reply(user_id: int, user_text: str, pool) -> str:
     history = user_memory[user_id][-10:]
     conv = "\n".join([f"Пользователь: {h['user']}\nЛеви: {h['levi']}" for h in history])
     prompt = f"{SYSTEM_PROMPT}{conv}\nПользователь: {user_text}\nЛеви:"
 
     try:
-        # Если text_generation асинхронный, используйте await client.text_generation(...)
-        # Если нет, используйте run_in_executor:
         loop = asyncio.get_event_loop()
         resp = await loop.run_in_executor(
             None,
@@ -64,10 +61,10 @@ async def generate_levi_reply(user_id: int, user_text: str) -> str:
         )
         reply = resp.strip().split("Пользователь:")[0].strip()
         user_memory[user_id].append({"user": user_text, "levi": reply})
-        save_user_message(user_id, user_text)  # Сохраняем сообщение в БД
+        await save_user_message(pool, user_id, user_text)
         return reply
     except Exception as e:
-        print("Ошибка:", e)
+        logging.exception("Ошибка в generate_levi_reply")
         return "Леви: ..."
 
 @dp.message(Command("start"))
@@ -81,9 +78,12 @@ async def handler(msg: types.Message):
         await msg.reply("Пожалуйста, напиши текст.")
         return
     try:
-        reply = await generate_levi_reply(msg.from_user.id, txt)
+        pool = await get_db_pool()
+        reply = await generate_levi_reply(msg.from_user.id, txt, pool)
         await msg.reply(reply)
+        await pool.close()
     except Exception as e:
+        logging.exception("Ошибка в handler")
         await msg.reply("Произошла ошибка. Попробуйте еще раз.")
 
 async def main():
@@ -92,6 +92,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
-
 
 
