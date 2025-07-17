@@ -1,0 +1,6 @@
+app = "levi-bot"
+primary_region = "fra" # или "ams", "lhr"
+
+[env]
+TELEGRAM_API_TOKEN = "8032363335:AAGszY5mrXZDnmTHNlBcYA_mfJyWcPG_RU4"
+HF_TOKEN = "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"
