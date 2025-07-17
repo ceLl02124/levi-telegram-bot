@@ -46,15 +46,21 @@ async def generate_levi_reply(user_id: int, user_text: str) -> str:
     history = user_memory[user_id][-10:]
     conv = "\n".join([f"Пользователь: {h['user']}\nЛеви: {h['levi']}" for h in history])
     prompt = f"{SYSTEM_PROMPT}{conv}\nПользователь: {user_text}\nЛеви:"
-    
+
     try:
-        resp = client.text_generation(
-            prompt,
-            model="tiiuae/falcon-7b-instruct",
-            max_new_tokens=500,
-            temperature=0.8,
-            top_p=0.95,
-            do_sample=True,
+        # Если text_generation асинхронный, используйте await client.text_generation(...)
+        # Если нет, используйте run_in_executor:
+        loop = asyncio.get_event_loop()
+        resp = await loop.run_in_executor(
+            None,
+            lambda: client.text_generation(
+                prompt,
+                model="tiiuae/falcon-7b-instruct",
+                max_new_tokens=500,
+                temperature=0.8,
+                top_p=0.95,
+                do_sample=True,
+            )
         )
         reply = resp.strip().split("Пользователь:")[0].strip()
         user_memory[user_id].append({"user": user_text, "levi": reply})
@@ -71,14 +77,20 @@ async def cmd_start(msg: types.Message):
 @dp.message()
 async def handler(msg: types.Message):
     txt = msg.text or ""
-    reply = await generate_levi_reply(msg.from_user.id, txt)
-    await msg.reply(reply)
+    if not txt.strip():
+        await msg.reply("Пожалуйста, напиши текст.")
+        return
+    try:
+        reply = await generate_levi_reply(msg.from_user.id, txt)
+        await msg.reply(reply)
+    except Exception as e:
+        await msg.reply("Произошла ошибка. Попробуйте еще раз.")
 
 async def main():
     print("Бот Леви запущен.")
     await dp.start_polling(bot)
 
-if name == "main":
+if __name__ == "__main__":
     asyncio.run(main())
 
 
