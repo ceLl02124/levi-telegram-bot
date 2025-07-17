@@ -51,7 +51,8 @@ async def cmd_start(msg: types.Message):
 @dp.message()
 async def handler(msg: types.Message):
     txt = msg.text or ""
-    reply = await generate_levi_reply(msg.from_user.id, txt)
+    user_id = msg.from_user.id if msg.from_user else msg.chat.id
+    reply = await generate_levi_reply(user_id, txt)
     await msg.reply(reply)
 
 async def main():
@@ -60,4 +61,5 @@ async def main():
 
 if __name__ == "__main__":
     asyncio.run(main())
+
 
