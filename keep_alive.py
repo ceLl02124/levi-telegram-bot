@@ -1,44 +1,22 @@
-from flask import Flask
-from threading import Thread
-import time
+# Dockerfile
 
-app = Flask('')
+# Используем легкий образ Python
+FROM python:3.11-slim
 
-@app.route('/')
-def home():
-    return "Леви Аккерман активен! Бот работает."
+# Устанавливаем рабочую директорию
+WORKDIR /app
 
-@app.route('/health')
-def health():
-    return {"status": "ok", "bot": "active", "timestamp": time.time()}
+# Копируем все файлы проекта в контейнер
+COPY . .
 
-@app.route('/ping')
-def ping():
-    return "pong"
+# Устанавливаем зависимости
+RUN pip install --no-cache-dir -r requirements.txt
 
-@app.route('/status')
-def status():
-    return "Леви Аккерман на страже! Бот активен и готов к бою!"
+# Устанавливаем переменные окружения
+ENV PYTHONUNBUFFERED=1
 
-def run():
-    import logging
-    import sys
-    import os
-    
-    # Полностью отключить все логи Flask
-    log = logging.getLogger('werkzeug')
-    log.disabled = True
-    
-    # Перенаправить стандартный вывод во время запуска Flask
-    with open(os.devnull, 'w') as devnull:
-        old_stdout = sys.stdout
-        sys.stdout = devnull
-        try:
-            app.run(host='0.0.0.0', port=8080, debug=False, use_reloader=False)
-        finally:
-            sys.stdout = old_stdout
+# Открываем порт для приложения
+EXPOSE 8080
 
-def keep_alive():
-    t = Thread(target=run)
-    t.daemon = True
-    t.start()
+# Запускаем бота
+CMD ["python", "bot.py"]
