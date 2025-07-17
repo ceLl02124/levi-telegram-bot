@@ -7,6 +7,7 @@ from huggingface_hub import InferenceClient
 from dotenv import load_dotenv
 import asyncpg
 
+# Загружаем переменные окружения из .env (если он есть)
 load_dotenv()
 
 TELEGRAM_API_TOKEN = os.getenv("TELEGRAM_API_TOKEN")
@@ -20,7 +21,7 @@ bot = Bot(token=TELEGRAM_API_TOKEN)
 dp = Dispatcher()
 
 client = InferenceClient(
-    provider="together",  # Важно: используем Together для Kimi модели
+    provider="together",  # Используем Together для Kimi модели
     api_key=HF_TOKEN,
 )
 
@@ -31,21 +32,30 @@ SYSTEM_PROMPT = (
     "Пишешь как в ролевой игре с описанием действий, мыслей и эмоций.\n\n"
 )
 
-# Подключение к базе данных
+# Асинхронное подключение к базе данных
 async def get_db():
-    return await asyncpg.connect(DATABASE_URL)
+    try:
+        conn = await asyncpg.connect(DATABASE_URL)
+        return conn
+    except Exception as e:
+        print("Ошибка подключения к БД:", e)
+        return None
 
 # Сохраняем сообщения в базу данных
 async def save_message(user_id: int, user_msg: str, levi_reply: str):
+    conn = await get_db()
+    if not conn:
+        print("Соединение с БД не установлено.")
+        return
     try:
-        conn = await get_db()
         await conn.execute(
             "INSERT INTO messages (user_id, user_msg, levi_reply) VALUES ($1, $2, $3)",
             user_id, user_msg, levi_reply
         )
-        await conn.close()
     except Exception as e:
-        print("DB Error:", e)
+        print("Ошибка записи в БД:", e)
+    finally:
+        await conn.close()
 
 async def generate_levi_reply(user_id: int, user_text: str) -> str:
     history = user_memory[user_id][-10:]
