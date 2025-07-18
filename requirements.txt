@@ -1,4 +1,4 @@
 aiogram
 python-dotenv
 huggingface_hub
-asyncpg
+flask
