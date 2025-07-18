@@ -1,22 +1,16 @@
-# Dockerfile
+from flask import Flask
+from threading import Thread
 
-# Используем легкий образ Python
-FROM python:3.11-slim
+app = Flask('')
 
-# Устанавливаем рабочую директорию
-WORKDIR /app
+@app.route('/')
+def home():
+    return "Я живой!"
 
-# Копируем все файлы проекта в контейнер
-COPY . .
+def run():
+    app.run(host='0.0.0.0', port=8080)
 
-# Устанавливаем зависимости
-RUN pip install --no-cache-dir -r requirements.txt
+def keep_alive():
+    t = Thread(target=run)
+    t.start()
 
-# Устанавливаем переменные окружения
-ENV PYTHONUNBUFFERED=1
-
-# Открываем порт для приложения
-EXPOSE 8080
-
-# Запускаем бота
-CMD ["python", "bot.py"]
